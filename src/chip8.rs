@@ -119,7 +119,8 @@ impl Chip8 {
             // 7XNN
             // Add the value NN to register VX.
             0x7000 => {
-                self.regs_v[dec_reg1!(inst) as usize] += dec_value!(inst);
+                let x = dec_reg1!(inst) as usize;
+                self.regs_v[x] = self.regs_v[x].wrapping_add(dec_value!(inst));
             }
 
             0x8000 => match inst & 0x000F {
@@ -152,7 +153,16 @@ impl Chip8 {
                 // Set VF to 01 if a carry occurs.
                 // Set VF to 00 if a carry does not occur.
                 0x0004 => {
+                    let x = dec_reg1!(inst) as usize;
+                    let y = dec_reg2!(inst) as usize;
 
+                    if let Some(result) = self.regs_v[x].checked_add(self.regs_v[y]) {
+                        self.regs_v[x] = result;
+                        self.regs_v[0xF] = 0;
+                    } else {
+                        self.regs_v[x] = self.regs_v[x].wrapping_add(self.regs_v[y]);
+                        self.regs_v[0xF] = 1;
+                    }
                 }
 
                 // 8XY5
