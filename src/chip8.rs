@@ -1,6 +1,7 @@
-use crate::{dec_errror, dec_mem_addr, dec_reg1, dec_reg2, dec_value};
+use crate::{dec_error, dec_mem_addr, dec_reg_x, dec_reg_y, dec_value8};
 
 const NUM_REGS: usize = 16;
+const REG_F: usize = 0xF;
 const STACK_SIZE: usize = 16;
 const MEM_SIZE: usize = 4096;
 const MEM_PROG_START: usize = 0x200;
@@ -89,7 +90,7 @@ impl Chip8 {
             // 3XNN
             // Skip the following instruction if the value of register VX equals NN.
             0x3000 => {
-                if self.regs_v[dec_reg1!(inst) as usize] == dec_value!(inst) {
+                if self.regs_v[dec_reg_x!(inst)] == dec_value8!(inst) {
                     self.reg_pc += 2;
                 }
             }
@@ -97,7 +98,7 @@ impl Chip8 {
             // 4XNN
             // Skip the following instruction if the value of register VX is not equal to NN.
             0x4000 => {
-                if self.regs_v[dec_reg1!(inst) as usize] != dec_value!(inst) {
+                if self.regs_v[dec_reg_x!(inst)] != dec_value8!(inst) {
                     self.reg_pc += 2;
                 }
             }
@@ -105,7 +106,7 @@ impl Chip8 {
             // 5XY0
             // Skip the following instruction if the value of register VX is equal to the value of register VY.
             0x5000 => {
-                if self.regs_v[dec_reg1!(inst) as usize] == self.regs_v[dec_reg2!(inst) as usize] {
+                if self.regs_v[dec_reg_x!(inst)] == self.regs_v[dec_reg_y!(inst)] {
                     self.reg_pc += 2;
                 }
             }
@@ -113,39 +114,40 @@ impl Chip8 {
             // 6XNN
             // Store number NN in register VX.
             0x6000 => {
-                self.regs_v[dec_reg1!(inst) as usize] = dec_value!(inst);
+                self.regs_v[dec_reg_x!(inst)] = dec_value8!(inst);
             }
 
             // 7XNN
             // Add the value NN to register VX.
             0x7000 => {
-                let x = dec_reg1!(inst) as usize;
-                self.regs_v[x] = self.regs_v[x].wrapping_add(dec_value!(inst));
+                let x = dec_reg_x!(inst);
+
+                self.regs_v[x] = self.regs_v[x].wrapping_add(dec_value8!(inst));
             }
 
             0x8000 => match inst & 0x000F {
                 // 8XY0
                 // Store the value of register VY in register VX.
                 0x0000 => {
-                    self.regs_v[dec_reg1!(inst) as usize] = self.regs_v[dec_reg2!(inst) as usize];
+                    self.regs_v[dec_reg_x!(inst)] = self.regs_v[dec_reg_y!(inst)];
                 }
 
                 // 8XY1
                 // Set VX to VX OR VY.
                 0x0001 => {
-                    self.regs_v[dec_reg1!(inst) as usize] |= self.regs_v[dec_reg2!(inst) as usize];
+                    self.regs_v[dec_reg_x!(inst)] |= self.regs_v[dec_reg_y!(inst)];
                 }
 
                 // 8XY2
                 // Set VX to VX AND VY.
                 0x0002 => {
-                    self.regs_v[dec_reg1!(inst) as usize] &= self.regs_v[dec_reg2!(inst) as usize];
+                    self.regs_v[dec_reg_x!(inst)] &= self.regs_v[dec_reg_y!(inst)];
                 }
 
                 // 8XY3
                 // Set VX to VX XOR VY.
                 0x0003 => {
-                    self.regs_v[dec_reg1!(inst) as usize] ^= self.regs_v[dec_reg2!(inst) as usize];
+                    self.regs_v[dec_reg_x!(inst)] ^= self.regs_v[dec_reg_y!(inst)];
                 }
 
                 // 8XY4
@@ -153,43 +155,68 @@ impl Chip8 {
                 // Set VF to 01 if a carry occurs.
                 // Set VF to 00 if a carry does not occur.
                 0x0004 => {
-                    let x = dec_reg1!(inst) as usize;
-                    let y = dec_reg2!(inst) as usize;
+                    let x = dec_reg_x!(inst);
+                    let y = dec_reg_y!(inst);
 
-                    if let Some(result) = self.regs_v[x].checked_add(self.regs_v[y]) {
-                        self.regs_v[x] = result;
-                        self.regs_v[0xF] = 0;
-                    } else {
-                        self.regs_v[x] = self.regs_v[x].wrapping_add(self.regs_v[y]);
-                        self.regs_v[0xF] = 1;
-                    }
+                    let (sum, carry) = self.regs_v[x].overflowing_add(self.regs_v[y]);
+
+                    self.regs_v[x] = sum;
+                    self.regs_v[REG_F] = carry.into();
                 }
 
                 // 8XY5
                 // Subtract the value of register VY from register VX.
                 // Set VF to 00 if a borrow occurs.
                 // Set VF to 01 if a borrow does not occur
-                0x0005 => {}
+                0x0005 => {
+                    let x = dec_reg_x!(inst);
+                    let y = dec_reg_y!(inst);
+
+                    let (sub, borrow) = self.regs_v[x].overflowing_sub(self.regs_v[y]);
+
+                    self.regs_v[x] = sub;
+                    self.regs_v[REG_F] = (!borrow).into();
+                }
 
                 // 8XY6
                 // Store the value of register VY shifted right one bit in register VX.
                 // Set register VF to the least significant bit prior to the shift.
                 // VY is unchanged
-                0x0006 => {}
+                0x0006 => {
+                    let x = dec_reg_x!(inst);
+                    let y = dec_reg_y!(inst);
+
+                    self.regs_v[REG_F] = self.regs_v[y] & 0x01;
+                    self.regs_v[x] = self.regs_v[y] >> 1;
+                }
 
                 // 8XY7
                 // Set register VX to the value of VY minus VX.
                 // Set VF to 00 if a borrow occurs.
                 // Set VF to 01 if a borrow does not occur.
-                0x0007 => {}
+                0x0007 => {
+                    let x = dec_reg_x!(inst);
+                    let y = dec_reg_y!(inst);
+
+                    let (sub, borrow) = self.regs_v[y].overflowing_sub(self.regs_v[y]);
+
+                    self.regs_v[x] = sub;
+                    self.regs_v[REG_F] = (!borrow).into();
+                }
 
                 // 8XYE
                 // Store the value of register VY shifted left one bit in register VX.
                 // Set register VF to the most significant bit prior to the shift.
                 // VY is unchanged.
-                0x000E => {}
+                0x000E => {
+                    let x = dec_reg_x!(inst);
+                    let y = dec_reg_y!(inst);
 
-                _ => dec_errror!(inst),
+                    self.regs_v[REG_F] = (self.regs_v[y] >> 7) & 0x01;
+                    self.regs_v[x] = self.regs_v[y] << 1;
+                }
+
+                _ => dec_error!(inst),
             },
 
             // 9XY0
@@ -222,7 +249,7 @@ impl Chip8 {
                 // Skip the following instruction if the key corresponding to the hex value currently stored in register VX is not pressed.
                 0x00A1 => {}
 
-                _ => dec_errror!(inst),
+                _ => dec_error!(inst),
             },
 
             0xF000 => match inst & 0x00FF {
@@ -263,10 +290,10 @@ impl Chip8 {
                 // Fill registers V0 to VX inclusive with the values stored in memory starting at address I.
                 0x0065 => {}
 
-                _ => dec_errror!(inst),
+                _ => dec_error!(inst),
             },
 
-            _ => dec_errror!(inst),
+            _ => dec_error!(inst),
         }
     }
 }

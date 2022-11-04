@@ -1,19 +1,19 @@
 #[macro_export]
-macro_rules! dec_reg1 {
+macro_rules! dec_reg_x {
     ($inst:expr) => {
-        ((($inst & 0x0F00) >> 8) as u8)
+        ((($inst & 0x0F00) >> 8) as usize)
     };
 }
 
 #[macro_export]
-macro_rules! dec_reg2 {
+macro_rules! dec_reg_y {
     ($inst:expr) => {
-        ((($inst & 0x00F0) >> 4) as u8)
+        ((($inst & 0x00F0) >> 4) as usize)
     };
 }
 
 #[macro_export]
-macro_rules! dec_value {
+macro_rules! dec_value8 {
     ($inst:expr) => {
         (($inst & 0x00FF) as u8)
     };
@@ -27,7 +27,7 @@ macro_rules! dec_mem_addr {
 }
 
 #[macro_export]
-macro_rules! dec_errror {
+macro_rules! dec_error {
     ($inst:expr) => {
         panic!("Unknown instruction: {:X}", $inst)
     };
