@@ -13,7 +13,14 @@ macro_rules! dec_reg_y {
 }
 
 #[macro_export]
-macro_rules! dec_value8 {
+macro_rules! dec_val_nibble {
+    ($inst:expr) => {
+        (($inst & 0x000F) as u8)
+    };
+}
+
+#[macro_export]
+macro_rules! dec_val_byte {
     ($inst:expr) => {
         (($inst & 0x00FF) as u8)
     };
