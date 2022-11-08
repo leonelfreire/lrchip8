@@ -39,7 +39,7 @@ pub struct Chip8 {
     inc_pc: bool,
     stack: [u16; STACK_SIZE],
     mem: [u8; MEM_SIZE],
-    gfx: [u8; GFX_SIZE],
+    pub gfx: [u8; GFX_SIZE],
     delay_t: u8,
     buzzer_t: u8,
 }
@@ -65,15 +65,29 @@ impl Chip8 {
         }
     }
 
+    pub fn print_display(&self) {
+        for i in 0..32 {
+            for j in 0..64 {
+                let c = if self.gfx[i * 64 + j] == 1 { 'X' } else { '.' };
+
+                print!("{c}");
+            }
+
+            println!();
+        }
+    }
+
     pub fn load(&mut self, program: &[u8]) {
         println!("Loading program ({} bytes)...", program.len());
 
-        if let Some(program_area) = self.mem.get_mut(PROG_START_ADDR..program.len()) {
+        if let Some(program_area) = self.mem.get_mut(PROG_START_ADDR..(PROG_START_ADDR + program.len())) {
             program_area.copy_from_slice(program);
             println!("{} bytes loaded.", program.len());
+        } else {
+            panic!("The program is too big to fit in memory.");
         }
 
-        panic!("The program is too big to fit in memory.");
+        self.reg_pc = PROG_START_ADDR as u16;
     }
 
     pub fn tick(&mut self) {
@@ -343,9 +357,37 @@ impl Chip8 {
     // Draw a sprite at position VX, VY with N bytes of sprite data starting at the address stored in I.
     // Set VF to 01 if any set pixels are changed to unset, and 00 otherwise.
     fn op_dxyn(&mut self, opcode: u16) {
-        let x = self.regs_v[dec_reg_x!(opcode)];
-        let y = self.regs_v[dec_reg_y!(opcode)];
-        let data = &self.mem[i!(self.reg_i)..i!(dec_val_nibble!(opcode))];
+        let x = self.regs_v[dec_reg_x!(opcode)] as usize % GFX_COLS;
+        let y = self.regs_v[dec_reg_y!(opcode)] as usize % GFX_ROWS;
+
+        let addr_start = self.reg_i as usize;
+        let n = dec_val_nibble!(opcode) as usize;
+
+        // Clip rows.
+        let addr_end = if (y + n) < GFX_ROWS {
+            addr_start + n
+        } else {
+            addr_start + (GFX_ROWS - y)
+        };
+
+        // Clip cols.
+        let bit_end = if (x + 8) < GFX_COLS { 8 } else { GFX_COLS - x };
+
+        self.regs_v[0xF] = 0;
+
+        for (y_ofst, addr) in (addr_start..addr_end).enumerate() {
+            for i in 0..bit_end {
+                if (self.mem[addr] & (0x80 >> i)) != 0 {
+                    let pixel_pos = ((y + y_ofst) * GFX_COLS) + x + i;
+
+                    if self.gfx[pixel_pos] == 1 {
+                        self.regs_v[0xF] = 1;
+                    }
+
+                    self.gfx[pixel_pos] ^= 1;
+                }
+            }
+        }
     }
 
     // EX9E
@@ -419,4 +461,21 @@ impl Chip8 {
 
         self.reg_i += (x + 1) as u16;
     }
+}
+
+pub fn f() -> Chip8 {
+    let mut c = Chip8::new();
+    c.regs_v[0] = 1;
+    c.regs_v[1] = 1;
+    c.reg_i = 0x400;
+    c.mem[0x400] = 0xF0;
+    c.mem[0x401] = 0x10;
+    c.mem[0x402] = 0xF0;
+    c.mem[0x403] = 0x10;
+    c.mem[0x404] = 0xF0;
+
+    c.op_dxyn(0xD015);
+    c.op_00e0();
+
+    c
 }
