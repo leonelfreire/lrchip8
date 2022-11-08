@@ -1,46 +1,20 @@
 use std::{fs, thread, time::Duration};
 
-use lrchip8::chip8::{f, Chip8};
+use lrchip8::{
+    chip8::{f, Chip8},
+    video::Video,
+};
 use sdl2::{event::Event, keyboard::Keycode, pixels::Color, rect::Rect};
 
 pub fn main() {
-    let mut c = f();
-    let f = fs::read("rom/chiptest-mini.ch8").unwrap();
-    c.load(&f);
+    let mut chip8 = f();
+    let rom = fs::read("rom/chiptest-mini.ch8").unwrap();
+    let mut video = Video::init();
 
-    let sdl_context = sdl2::init().unwrap();
-    let video_subsystem = sdl_context.video().unwrap();
-
-    let window = video_subsystem
-        .window("rust-sdl2 demo", 1024, 512)
-        .position_centered()
-        .build()
-        .unwrap();
-
-    let mut canvas = window.into_canvas().build().unwrap();
-
+    chip8.load(&rom);
     loop {
-        c.tick();
-
-        canvas.set_draw_color(Color::RGB(0, 0, 0));
-        canvas.clear();
-        canvas.set_draw_color(Color::RGB(200, 200, 200));
-
-        let rects = c
-            .gfx
-            .iter()
-            .enumerate()
-            .filter_map(|(i, &pixel)| {
-                if pixel == 1 {
-                    Some(Rect::new(i as i32 % 64 * 16, i as i32 / 64 * 16, 16, 16))
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<Rect>>();
-
-        canvas.fill_rects(&rects).unwrap();
-        canvas.present();
+        chip8.tick();
+        video.draw(&chip8.gfx);
 
         thread::sleep(Duration::from_secs_f64(1. / 60.));
     }

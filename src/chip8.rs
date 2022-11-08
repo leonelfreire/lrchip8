@@ -39,7 +39,7 @@ pub struct Chip8 {
     inc_pc: bool,
     stack: [u16; STACK_SIZE],
     mem: [u8; MEM_SIZE],
-    pub gfx: [u8; GFX_SIZE],
+    video: [u8; GFX_SIZE],
     delay_t: u8,
     buzzer_t: u8,
 }
@@ -59,28 +59,19 @@ impl Chip8 {
             inc_pc: false,
             stack: [0u16; STACK_SIZE],
             mem,
-            gfx: [0u8; GFX_SIZE],
+            video: [0u8; GFX_SIZE],
             delay_t: 0,
             buzzer_t: 0,
-        }
-    }
-
-    pub fn print_display(&self) {
-        for i in 0..32 {
-            for j in 0..64 {
-                let c = if self.gfx[i * 64 + j] == 1 { 'X' } else { '.' };
-
-                print!("{c}");
-            }
-
-            println!();
         }
     }
 
     pub fn load(&mut self, program: &[u8]) {
         println!("Loading program ({} bytes)...", program.len());
 
-        if let Some(program_area) = self.mem.get_mut(PROG_START_ADDR..(PROG_START_ADDR + program.len())) {
+        if let Some(program_area) = self
+            .mem
+            .get_mut(PROG_START_ADDR..(PROG_START_ADDR + program.len()))
+        {
             program_area.copy_from_slice(program);
             println!("{} bytes loaded.", program.len());
         } else {
@@ -162,7 +153,7 @@ impl Chip8 {
     // 00E0
     // Clear the screen.
     fn op_00e0(&mut self) {
-        self.gfx.fill(0);
+        self.video.fill(0);
     }
 
     // 00EE
@@ -380,11 +371,11 @@ impl Chip8 {
                 if (self.mem[addr] & (0x80 >> i)) != 0 {
                     let pixel_pos = ((y + y_ofst) * GFX_COLS) + x + i;
 
-                    if self.gfx[pixel_pos] == 1 {
+                    if self.video[pixel_pos] == 1 {
                         self.regs_v[0xF] = 1;
                     }
 
-                    self.gfx[pixel_pos] ^= 1;
+                    self.video[pixel_pos] ^= 1;
                 }
             }
         }
