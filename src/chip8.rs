@@ -8,9 +8,9 @@ const MEM_SIZE: usize = 4096;
 
 const PROG_START_ADDR: usize = 0x200;
 
-const GFX_COLS: usize = 64;
-const GFX_ROWS: usize = 32;
-const GFX_SIZE: usize = GFX_COLS * GFX_ROWS;
+const VIDEO_COLS: usize = 64;
+const VIDEO_ROWS: usize = 32;
+const VIDEO_SIZE: usize = VIDEO_COLS * VIDEO_ROWS;
 
 const FONT_SET: [u8; 80] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -39,13 +39,13 @@ pub struct Chip8 {
     inc_pc: bool,
     stack: [u16; STACK_SIZE],
     mem: [u8; MEM_SIZE],
-    video: [u8; GFX_SIZE],
+    video: [u8; VIDEO_SIZE],
     delay_t: u8,
     buzzer_t: u8,
 }
 
 impl Chip8 {
-    pub fn new() -> Self {
+    pub fn init() -> Self {
         let mut mem = [0u8; MEM_SIZE];
 
         let font_area = &mut mem[..FONT_SET.len()];
@@ -59,10 +59,22 @@ impl Chip8 {
             inc_pc: false,
             stack: [0u16; STACK_SIZE],
             mem,
-            video: [0u8; GFX_SIZE],
+            video: [0u8; VIDEO_SIZE],
             delay_t: 0,
             buzzer_t: 0,
         }
+    }
+
+    pub fn video_cols(&self) -> usize {
+        VIDEO_COLS
+    }
+
+    pub fn video_rows(&self) -> usize {
+        VIDEO_ROWS
+    }
+
+    pub fn video_buffer(&self) -> &[u8] {
+        &self.video
     }
 
     pub fn load(&mut self, program: &[u8]) {
@@ -348,28 +360,32 @@ impl Chip8 {
     // Draw a sprite at position VX, VY with N bytes of sprite data starting at the address stored in I.
     // Set VF to 01 if any set pixels are changed to unset, and 00 otherwise.
     fn op_dxyn(&mut self, opcode: u16) {
-        let x = self.regs_v[dec_reg_x!(opcode)] as usize % GFX_COLS;
-        let y = self.regs_v[dec_reg_y!(opcode)] as usize % GFX_ROWS;
+        let x = self.regs_v[dec_reg_x!(opcode)] as usize % VIDEO_COLS;
+        let y = self.regs_v[dec_reg_y!(opcode)] as usize % VIDEO_ROWS;
 
         let addr_start = self.reg_i as usize;
         let n = dec_val_nibble!(opcode) as usize;
 
         // Clip rows.
-        let addr_end = if (y + n) < GFX_ROWS {
+        let addr_end = if (y + n) < VIDEO_ROWS {
             addr_start + n
         } else {
-            addr_start + (GFX_ROWS - y)
+            addr_start + (VIDEO_ROWS - y)
         };
 
         // Clip cols.
-        let bit_end = if (x + 8) < GFX_COLS { 8 } else { GFX_COLS - x };
+        let bit_end = if (x + 8) < VIDEO_COLS {
+            8
+        } else {
+            VIDEO_COLS - x
+        };
 
         self.regs_v[0xF] = 0;
 
         for (y_ofst, addr) in (addr_start..addr_end).enumerate() {
             for i in 0..bit_end {
                 if (self.mem[addr] & (0x80 >> i)) != 0 {
-                    let pixel_pos = ((y + y_ofst) * GFX_COLS) + x + i;
+                    let pixel_pos = ((y + y_ofst) * VIDEO_COLS) + x + i;
 
                     if self.video[pixel_pos] == 1 {
                         self.regs_v[0xF] = 1;
@@ -452,21 +468,4 @@ impl Chip8 {
 
         self.reg_i += (x + 1) as u16;
     }
-}
-
-pub fn f() -> Chip8 {
-    let mut c = Chip8::new();
-    c.regs_v[0] = 1;
-    c.regs_v[1] = 1;
-    c.reg_i = 0x400;
-    c.mem[0x400] = 0xF0;
-    c.mem[0x401] = 0x10;
-    c.mem[0x402] = 0xF0;
-    c.mem[0x403] = 0x10;
-    c.mem[0x404] = 0xF0;
-
-    c.op_dxyn(0xD015);
-    c.op_00e0();
-
-    c
 }
