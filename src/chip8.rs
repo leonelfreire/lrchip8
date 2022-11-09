@@ -12,6 +12,8 @@ const VIDEO_COLS: usize = 64;
 const VIDEO_ROWS: usize = 32;
 const VIDEO_SIZE: usize = VIDEO_COLS * VIDEO_ROWS;
 
+const KEYS_SIZE: usize = 16;
+
 const FONT_SET: [u8; 80] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -40,6 +42,7 @@ pub struct Chip8 {
     stack: [u16; STACK_SIZE],
     mem: [u8; MEM_SIZE],
     video: [u8; VIDEO_SIZE],
+    keys: [u8; KEYS_SIZE],
     delay_t: u8,
     buzzer_t: u8,
 }
@@ -60,6 +63,7 @@ impl Chip8 {
             stack: [0u16; STACK_SIZE],
             mem,
             video: [0u8; VIDEO_SIZE],
+            keys: [0u8; KEYS_SIZE],
             delay_t: 0,
             buzzer_t: 0,
         }
@@ -171,8 +175,8 @@ impl Chip8 {
     // 00EE
     // Return from a subroutine.
     fn op_00ee(&mut self) {
-        self.reg_pc = self.stack[i!(self.reg_sp)];
         self.reg_sp -= 1;
+        self.reg_pc = self.stack[i!(self.reg_sp)];
         self.inc_pc = false;
     }
 
@@ -191,8 +195,8 @@ impl Chip8 {
     // 2NNN
     // Execute subroutine starting at address NNN.
     fn op_2nnn(&mut self, opcode: u16) {
-        self.reg_sp += 1;
         self.stack[i!(self.reg_sp)] = self.reg_pc;
+        self.reg_sp += 1;
         self.reg_pc = dec_mem_addr!(opcode);
         self.inc_pc = false;
     }
@@ -399,11 +403,25 @@ impl Chip8 {
 
     // EX9E
     // Skip the following instruction if the key corresponding to the hex value currently stored in register VX is pressed.
-    fn op_ex9e(&mut self, opcode: u16) {}
+    fn op_ex9e(&mut self, opcode: u16) {
+        let reg_vx = self.regs_v[dec_reg_x!(opcode)] as usize;
+
+        if self.keys[reg_vx] == 1 {
+            self.reg_pc += 2;
+            self.inc_pc = false;
+        }
+    }
 
     // EXA1
     // Skip the following instruction if the key corresponding to the hex value currently stored in register VX is not pressed.
-    fn op_exa1(&mut self, opcode: u16) {}
+    fn op_exa1(&mut self, opcode: u16) {
+        let reg_vx = self.regs_v[dec_reg_x!(opcode)] as usize;
+
+        if self.keys[reg_vx] == 0 {
+            self.reg_pc += 2;
+            self.inc_pc = false;
+        }
+    }
 
     // FX07
     // Store the current value of the delay timer in register VX.
@@ -413,7 +431,16 @@ impl Chip8 {
 
     // FX0A
     // Wait for a keypress and store the result in register VX.
-    fn op_fx0a(&mut self, opcode: u16) {}
+    fn op_fx0a(&mut self, opcode: u16) {
+        loop {
+            if let Ok(key) = self.keys.binary_search(&1) {
+                self.regs_v[dec_reg_x!(opcode)] = key as u8;
+                break;
+            }
+
+            // TODO: update timers.
+        }
+    }
 
     // FX15
     // Set the delay timer to the value of register VX.
@@ -433,11 +460,18 @@ impl Chip8 {
         let reg_vx = self.regs_v[dec_reg_x!(opcode)];
 
         self.reg_i = self.reg_i.wrapping_add(reg_vx as u16);
+
+        // Spacefight 2091!
+        if self.reg_i > 0xFFF {
+            self.regs_v[0xF] = 1;
+        }
     }
 
     // FX29
     // Set I to the memory address of the sprite data corresponding to the hexadecimal digit stored in register VX.
-    fn op_fx29(&mut self, opcode: u16) {}
+    fn op_fx29(&mut self, opcode: u16) {
+        self.reg_i = (self.regs_v[dec_reg_x!(opcode)] & 0x00FF) as u16;
+    }
 
     // FX33
     // Store the binary-coded decimal equivalent of the value stored in register VX at addresses I, I + 1, and I + 2.

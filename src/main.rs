@@ -13,16 +13,16 @@ fn main() {
         chip8.video_rows(),
         SCALE_FACTOR,
         Color::BLACK,
-        Color::GRAY,
+        Color::WHITE,
     );
 
-    let rom = fs::read("rom/chiptest-mini.ch8").unwrap();
+    let rom = fs::read("rom/ibm.ch8").unwrap();
 
     chip8.load(&rom);
 
     loop {
         chip8.tick();
         video.draw(chip8.video_buffer());
-        thread::sleep(Duration::from_secs_f64(10. / 60.));
+        thread::sleep(Duration::from_secs_f64(1. / 60.));
     }
 }
