@@ -42,7 +42,8 @@ pub struct Chip8 {
     stack: [u16; STACK_SIZE],
     mem: [u8; MEM_SIZE],
     video: [u8; VIDEO_SIZE],
-    keys: [u8; KEYS_SIZE],
+    keys: [bool; KEYS_SIZE],
+    wait_for_key: Option<u8>,
     delay_t: u8,
     buzzer_t: u8,
 }
@@ -63,7 +64,8 @@ impl Chip8 {
             stack: [0u16; STACK_SIZE],
             mem,
             video: [0u8; VIDEO_SIZE],
-            keys: [0u8; KEYS_SIZE],
+            keys: [false; KEYS_SIZE],
+            wait_for_key: None,
             delay_t: 0,
             buzzer_t: 0,
         }
@@ -77,8 +79,12 @@ impl Chip8 {
         VIDEO_ROWS
     }
 
-    pub fn video_buffer(&self) -> &[u8] {
+    pub fn read_video(&self) -> &[u8] {
         &self.video
+    }
+
+    pub fn write_keys(&mut self, keys: &[bool]) {
+        self.keys.copy_from_slice(&keys[..KEYS_SIZE]);
     }
 
     pub fn load(&mut self, program: &[u8]) {
@@ -175,9 +181,17 @@ impl Chip8 {
     // 00EE
     // Return from a subroutine.
     fn op_00ee(&mut self) {
+        println!("00B Stack: {:?}", self.stack);
+        println!("00B SP: {:?}", self.reg_sp);
+        println!("00B PC: {:X} - {:X}", self.reg_pc, self.mem[i!(self.reg_pc)]);
+
         self.reg_sp -= 1;
         self.reg_pc = self.stack[i!(self.reg_sp)];
         self.inc_pc = false;
+
+        println!("00A Stack: {:?}", self.stack);
+        println!("00A SP: {:?}", self.reg_sp);
+        println!("00A PC: {:X} - {:X}", self.reg_pc, self.mem[i!(self.reg_pc)]);
     }
 
     // 0NNN
@@ -195,17 +209,25 @@ impl Chip8 {
     // 2NNN
     // Execute subroutine starting at address NNN.
     fn op_2nnn(&mut self, opcode: u16) {
+        println!("B Stack: {:?}", self.stack);
+        println!("B SP: {:X}", self.reg_sp);
+        println!("B PC: {:X} - {:X}", self.reg_pc, self.mem[i!(self.reg_pc)]);
+
         self.stack[i!(self.reg_sp)] = self.reg_pc;
         self.reg_sp += 1;
         self.reg_pc = dec_mem_addr!(opcode);
         self.inc_pc = false;
+
+        println!("A Stack: {:?}", self.stack);
+        println!("A SP: {:X}", self.reg_sp);
+        println!("A PC: {:X} - {:X}", self.reg_pc, self.mem[i!(self.reg_pc)]);
     }
 
     // 3XNN
     // Skip the following instruction if the value of register VX equals NN.
     fn op_3xnn(&mut self, opcode: u16) {
         if self.regs_v[dec_reg_x!(opcode)] == dec_val_byte!(opcode) {
-            self.reg_pc += 2;
+            self.reg_pc += 4;
             self.inc_pc = false;
         }
     }
@@ -214,7 +236,7 @@ impl Chip8 {
     // Skip the following instruction if the value of register VX is not equal to NN.
     fn op_4xnn(&mut self, opcode: u16) {
         if self.regs_v[dec_reg_x!(opcode)] != dec_val_byte!(opcode) {
-            self.reg_pc += 2;
+            self.reg_pc += 4;
             self.inc_pc = false;
         }
     }
@@ -223,7 +245,7 @@ impl Chip8 {
     // Skip the following instruction if the value of register VX is equal to the value of register VY.
     fn op_5xy0(&mut self, opcode: u16) {
         if self.regs_v[dec_reg_x!(opcode)] == self.regs_v[dec_reg_y!(opcode)] {
-            self.reg_pc += 2;
+            self.reg_pc += 4;
             self.inc_pc = false;
         }
     }
@@ -336,7 +358,7 @@ impl Chip8 {
     // Skip the following instruction if the value of register VX is not equal to the value of register VY.
     fn op_9xy0(&mut self, opcode: u16) {
         if self.regs_v[dec_reg_x!(opcode)] != self.regs_v[dec_reg_y!(opcode)] {
-            self.reg_pc += 2;
+            self.reg_pc += 4;
             self.inc_pc = false;
         }
     }
@@ -406,8 +428,8 @@ impl Chip8 {
     fn op_ex9e(&mut self, opcode: u16) {
         let reg_vx = self.regs_v[dec_reg_x!(opcode)] as usize;
 
-        if self.keys[reg_vx] == 1 {
-            self.reg_pc += 2;
+        if self.keys[reg_vx] == true {
+            self.reg_pc += 4;
             self.inc_pc = false;
         }
     }
@@ -417,8 +439,8 @@ impl Chip8 {
     fn op_exa1(&mut self, opcode: u16) {
         let reg_vx = self.regs_v[dec_reg_x!(opcode)] as usize;
 
-        if self.keys[reg_vx] == 0 {
-            self.reg_pc += 2;
+        if self.keys[reg_vx] == false {
+            self.reg_pc += 4;
             self.inc_pc = false;
         }
     }
@@ -432,13 +454,19 @@ impl Chip8 {
     // FX0A
     // Wait for a keypress and store the result in register VX.
     fn op_fx0a(&mut self, opcode: u16) {
-        loop {
-            if let Ok(key) = self.keys.binary_search(&1) {
-                self.regs_v[dec_reg_x!(opcode)] = key as u8;
-                break;
-            }
+        self.inc_pc = false;
 
-            // TODO: update timers.
+        if let Some(key) = self.wait_for_key {
+            if !self.keys[i!(key)] {
+                self.regs_v[dec_reg_x!(opcode)] = key;
+                self.wait_for_key = None;
+                self.inc_pc = true;
+            }
+        } else {
+            if let Some(key) = self.keys.iter().position(|&k| k) {
+                self.keys[key] = true;
+                self.wait_for_key = Some(key as u8);
+            }
         }
     }
 

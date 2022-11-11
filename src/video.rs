@@ -1,4 +1,4 @@
-use sdl2::{pixels::Color, rect::Rect, render::WindowCanvas};
+use sdl2::{pixels::Color, rect::Rect, render::WindowCanvas, VideoSubsystem};
 
 const WINDOW_TITLE: &str = "lrchip8";
 
@@ -12,14 +12,13 @@ pub struct Video {
 
 impl Video {
     pub fn init(
+        video_subsystem: VideoSubsystem,
         cols: usize,
         rows: usize,
         scale_factor: usize,
         bg_color: Color,
         pxl_color: Color,
     ) -> Self {
-        let sdl_context = sdl2::init().unwrap();
-        let video_subsystem = sdl_context.video().unwrap();
         let width = (cols * scale_factor) as u32;
         let height = (rows * scale_factor) as u32;
 
