@@ -7,7 +7,7 @@ use lrchip8::{
 };
 use sdl2::pixels::Color;
 
-const SCALE_FACTOR: usize = 24;
+const SCALE_FACTOR: usize = 12;
 
 fn main() {
     let sdl_context = sdl2::init().unwrap();
@@ -27,7 +27,7 @@ fn main() {
 
     let mut input = Input::init(event_pump);
 
-    let rom = fs::read("rom/ibm.ch8").unwrap();
+    let rom = fs::read("rom/test_opcode.ch8").unwrap();
 
     chip8.load(&rom);
 
