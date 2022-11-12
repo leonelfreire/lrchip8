@@ -1,4 +1,4 @@
-use std::{fs, thread, time::Duration};
+use std::{fs, thread, time::{Duration, Instant}};
 
 use lrchip8::{
     chip8::Chip8,
@@ -7,7 +7,7 @@ use lrchip8::{
 };
 use sdl2::pixels::Color;
 
-const SCALE_FACTOR: usize = 12;
+const SCALE_FACTOR: usize = 18;
 
 fn main() {
     let sdl_context = sdl2::init().unwrap();
@@ -31,18 +31,25 @@ fn main() {
 
     chip8.load(&rom);
 
-    'main_loop: loop {
-        let keys = input.read();
+    'mainloop: loop {
+        let start_time = Instant::now();
 
-        if keys[input::KEY_QUIT] {
-            break 'main_loop;
+        for _ in 0..8 {
+            let keys = input.read();
+
+            if keys[input::KEY_QUIT] {
+                break 'mainloop;
+            }
+
+            chip8.write_keys(&keys);
+            chip8.tick();
         }
-
-        chip8.write_keys(&keys);
-        chip8.tick();
 
         video.draw(chip8.read_video());
 
-        thread::sleep(Duration::from_secs_f64(1.0 / 60.));
+        chip8.update_timers();
+
+        let elapsed_time = Instant::now() - start_time;
+        thread::sleep(Duration::from_secs_f64((1.0 / 60.0) - elapsed_time.as_secs_f64()));
     }
 }
