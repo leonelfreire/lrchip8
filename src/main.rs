@@ -1,4 +1,7 @@
-use std::{fs, thread, time::{Duration, Instant}, env::{Args, self}};
+use std::{
+    env, fs, thread,
+    time::{Duration, Instant},
+};
 
 use lrchip8::{
     chip8::Chip8,
@@ -7,10 +10,15 @@ use lrchip8::{
 };
 use sdl2::pixels::Color;
 
-const SCALE_FACTOR: usize = 18;
+const SCALE_FACTOR: usize = 24;
 
 fn main() {
     let args = env::args().collect::<Vec<String>>();
+
+    if args.len() != 2 {
+        println!("Please inform a rom path.");
+        return;
+    }
 
     let rom_path = &args[1];
 
@@ -26,7 +34,7 @@ fn main() {
         chip8.video_rows(),
         SCALE_FACTOR,
         Color::BLACK,
-        Color::GREEN,
+        Color::GREY,
     );
 
     let mut input = Input::init(event_pump);
@@ -38,7 +46,7 @@ fn main() {
     'mainloop: loop {
         let start_time = Instant::now();
 
-        for _ in 0..8 {
+        for _ in 0..32 {
             let keys = input.read();
 
             if keys[input::KEY_QUIT] {
@@ -54,6 +62,8 @@ fn main() {
         chip8.update_timers();
 
         let elapsed_time = Instant::now() - start_time;
-        thread::sleep(Duration::from_secs_f64((1.0 / 60.0) - elapsed_time.as_secs_f64()));
+        thread::sleep(Duration::from_secs_f64(
+            (1.0 / 60.0) - elapsed_time.as_secs_f64(),
+        ));
     }
 }
