@@ -8,7 +8,7 @@ const STACK_SIZE: usize = 16;
 
 const MEM_SIZE: usize = 4096;
 
-const PROG_START_ADDR: usize = 0x200;
+const ROM_START_ADDR: usize = 0x200;
 
 const VIDEO_COLS: usize = 64;
 const VIDEO_ROWS: usize = 32;
@@ -93,19 +93,19 @@ impl Chip8 {
     }
 
     pub fn load(&mut self, rom: &[u8]) {
-        println!("Loading program ({} bytes)...", rom.len());
+        println!("Loading rom ({} bytes)...", rom.len());
 
-        if let Some(program_area) = self
+        if let Some(rom_area) = self
             .mem
-            .get_mut(PROG_START_ADDR..(PROG_START_ADDR + rom.len()))
+            .get_mut(ROM_START_ADDR..(ROM_START_ADDR + rom.len()))
         {
-            program_area.copy_from_slice(rom);
+            rom_area.copy_from_slice(rom);
             println!("{} bytes loaded.", rom.len());
         } else {
             panic!("The program is too big to fit in memory.");
         }
 
-        self.pc = PROG_START_ADDR as u16;
+        self.pc = ROM_START_ADDR as u16;
     }
 
     pub fn load16(&mut self, rom16: &[u16]) {
@@ -120,6 +120,7 @@ impl Chip8 {
     pub fn tick(&mut self) {
         let opcode = self.fetch();
 
+        #[cfg(debug_assertions)]
         println!(
             "[OP=0x{:0>4X}] [I=0x{:0>4X}, PC=0x{:0>4X}, SP=0x{:0>4X}, V={:?}]",
             opcode, self.i, self.pc, self.sp, self.v
@@ -146,11 +147,11 @@ impl Chip8 {
             },
             0x1000 => self.op_1nnn(dec_addr!(opcode)),
             0x2000 => self.op_2nnn(dec_addr!(opcode)),
-            0x3000 => self.op_3xnn(dec_x!(opcode), dec_byte!(opcode)),
-            0x4000 => self.op_4xnn(dec_x!(opcode), dec_byte!(opcode)),
+            0x3000 => self.op_3xkk(dec_x!(opcode), dec_byte!(opcode)),
+            0x4000 => self.op_4xkk(dec_x!(opcode), dec_byte!(opcode)),
             0x5000 => self.op_5xy0(dec_x!(opcode), dec_y!(opcode)),
-            0x6000 => self.op_6xnn(dec_x!(opcode), dec_byte!(opcode)),
-            0x7000 => self.op_7xnn(dec_x!(opcode), dec_byte!(opcode)),
+            0x6000 => self.op_6xkk(dec_x!(opcode), dec_byte!(opcode)),
+            0x7000 => self.op_7xkk(dec_x!(opcode), dec_byte!(opcode)),
             0x8000 => match opcode & 0x000F {
                 0x0000 => self.op_8xy0(dec_x!(opcode), dec_y!(opcode)),
                 0x0001 => self.op_8xy1(dec_x!(opcode), dec_y!(opcode)),
@@ -166,7 +167,7 @@ impl Chip8 {
             0x9000 => self.op_9xy0(dec_x!(opcode), dec_y!(opcode)),
             0xA000 => self.op_annn(dec_addr!(opcode)),
             0xB000 => self.op_bnnn(dec_addr!(opcode)),
-            0xC000 => self.op_cxnn(dec_x!(opcode), dec_byte!(opcode)),
+            0xC000 => self.op_cxkk(dec_x!(opcode), dec_byte!(opcode)),
             0xD000 => self.op_dxyn(dec_x!(opcode), dec_y!(opcode), dec_nibble!(opcode)),
             0xE000 => match opcode & 0x00FF {
                 0x009E => self.op_ex9e(dec_x!(opcode)),
@@ -224,7 +225,7 @@ impl Chip8 {
 
     // 3xkk - SE Vx, byte
     // Skip next instruction if Vx = kk.
-    fn op_3xnn(&mut self, x: usize, kk: u8) {
+    fn op_3xkk(&mut self, x: usize, kk: u8) {
         if self.v[x] == kk {
             self.pc += 2;
         }
@@ -232,7 +233,7 @@ impl Chip8 {
 
     // 4xkk - SNE Vx, byte
     // Skip next instruction if Vx != kk.
-    fn op_4xnn(&mut self, x: usize, kk: u8) {
+    fn op_4xkk(&mut self, x: usize, kk: u8) {
         if self.v[x] != kk {
             self.pc += 2;
         }
@@ -248,13 +249,13 @@ impl Chip8 {
 
     // 6xkk - LD Vx, byte
     // Set Vx = kk.
-    fn op_6xnn(&mut self, x: usize, kk: u8) {
+    fn op_6xkk(&mut self, x: usize, kk: u8) {
         self.v[x] = kk;
     }
 
     // 7xkk - ADD Vx, byte
     // Set Vx = Vx + kk.
-    fn op_7xnn(&mut self, x: usize, kk: u8) {
+    fn op_7xkk(&mut self, x: usize, kk: u8) {
         self.v[x] = self.v[x].wrapping_add(kk);
     }
 
@@ -347,7 +348,7 @@ impl Chip8 {
 
     // Cxkk - RND Vx, byte
     // Set Vx = random byte AND kk.
-    fn op_cxnn(&mut self, x: usize, kk: u8) {
+    fn op_cxkk(&mut self, x: usize, kk: u8) {
         self.v[x] = fastrand::u8(0..=255) & kk;
     }
 
@@ -426,7 +427,7 @@ impl Chip8 {
 
         if let Some(key) = self.wait_for_key {
             if !self.keys[key as usize] {
-                println!("Got key {:?}", self.wait_for_key);
+                println!("Got key 0x{:X}.", key);
                 self.v[x] = key;
                 self.wait_for_key = None;
                 return;

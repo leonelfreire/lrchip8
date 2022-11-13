@@ -36,6 +36,6 @@ macro_rules! dec_addr {
 #[macro_export]
 macro_rules! dec_error {
     ($opcode:expr) => {
-        panic!("Unknown instruction: {:X}", $opcode)
+        panic!("Unknown opcode: {:X}", $opcode)
     };
 }
