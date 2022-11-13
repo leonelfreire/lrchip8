@@ -64,10 +64,10 @@ impl Input {
             Keycode::Z => 0xA,
             Keycode::X => 0,
             Keycode::C => 0xB,
-            Keycode::V => 0xC,
-            Keycode::F => 0xD,
-            Keycode::R => 0xE,
-            Keycode::Num4 => 0xF,
+            Keycode::V => 0xF,
+            Keycode::F => 0xE,
+            Keycode::R => 0xD,
+            Keycode::Num4 => 0xC,
             _ => return None,
         })
     }
