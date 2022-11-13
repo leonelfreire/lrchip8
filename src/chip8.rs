@@ -1,3 +1,5 @@
+use std::fmt::format;
+
 use crate::{dec_addr, dec_byte, dec_error, dec_nibble, dec_x, dec_y};
 
 const NUM_REGS: usize = 16;
@@ -42,9 +44,9 @@ pub struct Chip8 {
     mem: [u8; MEM_SIZE],
     video: [u8; VIDEO_SIZE],
     keys: [bool; KEYS_SIZE],
-    wait_for_key: Option<u8>,
     delay_t: u8,
     buzzer_t: u8,
+    wait_for_key: Option<u8>,
     schip_shift: bool,
     schip_load: bool,
 }
@@ -65,9 +67,9 @@ impl Chip8 {
             mem,
             video: [0u8; VIDEO_SIZE],
             keys: [false; KEYS_SIZE],
-            wait_for_key: None,
             delay_t: 0,
             buzzer_t: 0,
+            wait_for_key: None,
             schip_shift: true,
             schip_load: true,
         }
@@ -121,18 +123,22 @@ impl Chip8 {
 
     pub fn tick(&mut self) {
         let opcode = self.fetch();
+
         println!(
-            "Executing opcode [0x{opcode:0>4X}] [I=0x{:0>4X}, PC=0x{:0>4X}, SP=0x{:0>4X}]",
-            self.i, self.pc, self.sp
+            "[OP=0x{:0>4X}] [I=0x{:0>4X}, PC=0x{:0>4X}, SP=0x{:0>4X}, V={:?}]",
+            opcode, self.i, self.pc, self.sp, self.v
         );
 
         self.execute(opcode);
     }
 
-    fn fetch(&self) -> u16 {
+    fn fetch(&mut self) -> u16 {
         let pc = self.pc as usize;
+        let opcode = (self.mem[pc] as u16) << 8 | self.mem[pc + 1] as u16;
 
-        (self.mem[pc] as u16) << 8 | self.mem[pc + 1] as u16
+        self.pc += 2;
+
+        opcode
     }
 
     fn execute(&mut self, opcode: u16) {
@@ -191,7 +197,6 @@ impl Chip8 {
     // Clear the screen.
     fn op_00e0(&mut self) {
         self.video.fill(0);
-        self.pc += 2;
     }
 
     // 00EE
@@ -215,7 +220,7 @@ impl Chip8 {
     // 2NNN
     // Execute subroutine starting at address NNN.
     fn op_2nnn(&mut self, addr: u16) {
-        self.stack[self.sp as usize] = self.pc + 2;
+        self.stack[self.sp as usize] = self.pc;
         self.sp += 1;
         self.pc = addr;
     }
@@ -223,61 +228,61 @@ impl Chip8 {
     // 3XNN
     // Skip the following instruction if the value of register VX equals NN.
     fn op_3xnn(&mut self, x: usize, nn: u8) {
-        self.pc += if self.v[x] == nn { 4 } else { 2 };
+        if self.v[x] == nn {
+            self.pc += 2;
+        }
     }
 
     // 4XNN
     // Skip the following instruction if the value of register VX is not equal to NN.
     fn op_4xnn(&mut self, x: usize, nn: u8) {
-        self.pc += if self.v[x] != nn { 4 } else { 2 };
+        if self.v[x] != nn {
+            self.pc += 2;
+        }
     }
 
     // 5XY0
     // Skip the following instruction if the value of register VX is equal to the value of register VY.
     fn op_5xy0(&mut self, x: usize, y: usize) {
-        self.pc += if self.v[x] == self.v[y] { 4 } else { 2 };
+        if self.v[x] == self.v[y] {
+            self.pc += 2;
+        }
     }
 
     // 6XNN
     // Store number NN in register VX.
     fn op_6xnn(&mut self, x: usize, nn: u8) {
         self.v[x] = nn;
-        self.pc += 2;
     }
 
     // 7XNN
     // Add the value NN to register VX.
     fn op_7xnn(&mut self, x: usize, nn: u8) {
         self.v[x] = self.v[x].wrapping_add(nn);
-        self.pc += 2;
     }
 
     // 8XY0
     // Store the value of register VY in register VX.
     fn op_8xy0(&mut self, x: usize, y: usize) {
         self.v[x] = self.v[y];
-        self.pc += 2;
     }
 
     // 8XY1
     // Set VX to VX OR VY.
     fn op_8xy1(&mut self, x: usize, y: usize) {
         self.v[x] |= self.v[y];
-        self.pc += 2;
     }
 
     // 8XY2
     // Set VX to VX AND VY.
     fn op_8xy2(&mut self, x: usize, y: usize) {
         self.v[x] &= self.v[y];
-        self.pc += 2;
     }
 
     // 8XY3
     // Set VX to VX XOR VY.
     fn op_8xy3(&mut self, x: usize, y: usize) {
         self.v[x] ^= self.v[y];
-        self.pc += 2;
     }
 
     // 8XY4
@@ -289,7 +294,6 @@ impl Chip8 {
 
         self.v[x] = sum;
         self.v[0xF] = carry.into();
-        self.pc += 2;
     }
 
     // 8XY5
@@ -301,7 +305,6 @@ impl Chip8 {
 
         self.v[x] = sub;
         self.v[0xF] = (!borrow).into();
-        self.pc += 2;
     }
 
     // 8XY6
@@ -322,8 +325,6 @@ impl Chip8 {
             self.v[0xF] = self.v[y] & 1;
             self.v[x] = self.v[y] >> 1;
         }
-
-        self.pc += 2;
     }
 
     // 8XY7
@@ -335,7 +336,6 @@ impl Chip8 {
 
         self.v[x] = sub;
         self.v[0xF] = (!borrow).into();
-        self.pc += 2;
     }
 
     // 8XYE
@@ -356,21 +356,20 @@ impl Chip8 {
             self.v[0xF] = (self.v[y] >> 7) & 1;
             self.v[x] = self.v[y] << 1;
         }
-
-        self.pc += 2;
     }
 
     // 9XY0
     // Skip the following instruction if the value of register VX is not equal to the value of register VY.
     fn op_9xy0(&mut self, x: usize, y: usize) {
-        self.pc += if self.v[x] != self.v[y] { 4 } else { 2 };
+        if self.v[x] != self.v[y] {
+            self.pc += 2;
+        }
     }
 
     // ANNN
     // Store memory address NNN in register I.
     fn op_annn(&mut self, addr: u16) {
         self.i = addr;
-        self.pc += 2;
     }
 
     // BNNN
@@ -383,7 +382,6 @@ impl Chip8 {
     // Set VX to a random number with a mask of NN.
     fn op_cxnn(&mut self, x: usize, nn: u8) {
         self.v[x] = fastrand::u8(0..=255) & nn;
-        self.pc += 2;
     }
 
     // DXYN
@@ -427,8 +425,6 @@ impl Chip8 {
                 }
             }
         }
-
-        self.pc += 2;
     }
 
     // EX9E
@@ -436,7 +432,9 @@ impl Chip8 {
     fn op_ex9e(&mut self, x: usize) {
         let vx = self.v[x] as usize;
 
-        self.pc += if self.keys[vx] == true { 4 } else { 2 };
+        if self.keys[vx] == true {
+            self.pc += 2;
+        }
     }
 
     // EXA1
@@ -444,14 +442,15 @@ impl Chip8 {
     fn op_exa1(&mut self, x: usize) {
         let vx = self.v[x] as usize;
 
-        self.pc += if self.keys[vx] == false { 4 } else { 2 };
+        if self.keys[vx] == false {
+            self.pc += 2;
+        }
     }
 
     // FX07
     // Store the current value of the delay timer in register VX.
     fn op_fx07(&mut self, x: usize) {
         self.v[x] = self.delay_t;
-        self.pc += 2;
     }
 
     // FX0A
@@ -464,28 +463,27 @@ impl Chip8 {
                 println!("Got key {:?}", self.wait_for_key);
                 self.v[x] = key;
                 self.wait_for_key = None;
-                self.pc += 2;
+                return;
             }
-        } else {
-            if let Some(key) = self.keys.iter().position(|&k| k) {
-                self.keys[key] = true;
-                self.wait_for_key = Some(key as u8);
-            }
+        } else if let Some(key) = self.keys.iter().position(|&k| k) {
+            self.keys[key] = true;
+            self.wait_for_key = Some(key as u8);
         }
+
+        // Try again.
+        self.pc -= 2;
     }
 
     // FX15
     // Set the delay timer to the value of register VX.
     fn op_fx15(&mut self, x: usize) {
         self.delay_t = self.v[x];
-        self.pc += 2;
     }
 
     // FX18
     // Set the sound timer to the value of register VX.
     fn op_fx18(&mut self, x: usize) {
         self.buzzer_t = self.v[x];
-        self.pc += 2;
     }
 
     // FX1E
@@ -495,7 +493,6 @@ impl Chip8 {
 
         self.i = self.i.wrapping_add(vx);
         self.v[0xF] = if self.i > 0xFFF { 1 } else { 0 };
-        self.pc += 2;
     }
 
     // FX29
@@ -504,7 +501,6 @@ impl Chip8 {
         let vx = self.v[x] as u16;
 
         self.i = vx * 5;
-        self.pc += 2;
     }
 
     // FX33
@@ -516,7 +512,6 @@ impl Chip8 {
         self.mem[i] = n / 100;
         self.mem[i + 1] = n % 100 / 10;
         self.mem[i + 2] = n % 10;
-        self.pc += 2;
     }
 
     // FX55
@@ -530,8 +525,6 @@ impl Chip8 {
         if !self.schip_load {
             self.i += (x + 1) as u16;
         }
-
-        self.pc += 2;
     }
 
     // FX65
@@ -545,8 +538,6 @@ impl Chip8 {
         if !self.schip_load {
             self.i += (x + 1) as u16;
         }
-
-        self.pc += 2;
     }
 }
 

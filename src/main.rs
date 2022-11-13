@@ -1,4 +1,4 @@
-use std::{fs, thread, time::{Duration, Instant}};
+use std::{fs, thread, time::{Duration, Instant}, env::{Args, self}};
 
 use lrchip8::{
     chip8::Chip8,
@@ -10,6 +10,10 @@ use sdl2::pixels::Color;
 const SCALE_FACTOR: usize = 18;
 
 fn main() {
+    let args = env::args().collect::<Vec<String>>();
+
+    let rom_path = &args[1];
+
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     let event_pump = sdl_context.event_pump().unwrap();
@@ -22,12 +26,12 @@ fn main() {
         chip8.video_rows(),
         SCALE_FACTOR,
         Color::BLACK,
-        Color::WHITE,
+        Color::GREEN,
     );
 
     let mut input = Input::init(event_pump);
 
-    let rom = fs::read("rom/test_opcode.ch8").unwrap();
+    let rom = fs::read(rom_path).unwrap();
 
     chip8.load(&rom);
 
