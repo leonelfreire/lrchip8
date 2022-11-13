@@ -1,4 +1,4 @@
-use std::fmt::format;
+// Reference: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
 
 use crate::{dec_addr, dec_byte, dec_error, dec_nibble, dec_x, dec_y};
 
@@ -47,8 +47,6 @@ pub struct Chip8 {
     delay_t: u8,
     buzzer_t: u8,
     wait_for_key: Option<u8>,
-    schip_shift: bool,
-    schip_load: bool,
 }
 
 impl Chip8 {
@@ -70,8 +68,6 @@ impl Chip8 {
             delay_t: 0,
             buzzer_t: 0,
             wait_for_key: None,
-            schip_shift: true,
-            schip_load: true,
         }
     }
 
@@ -162,9 +158,9 @@ impl Chip8 {
                 0x0003 => self.op_8xy3(dec_x!(opcode), dec_y!(opcode)),
                 0x0004 => self.op_8xy4(dec_x!(opcode), dec_y!(opcode)),
                 0x0005 => self.op_8xy5(dec_x!(opcode), dec_y!(opcode)),
-                0x0006 => self.op_8xy6(dec_x!(opcode), dec_y!(opcode)),
+                0x0006 => self.op_8xy6(dec_x!(opcode)),
                 0x0007 => self.op_8xy7(dec_x!(opcode), dec_y!(opcode)),
-                0x000E => self.op_8xye(dec_x!(opcode), dec_y!(opcode)),
+                0x000E => self.op_8xye(dec_x!(opcode)),
                 _ => dec_error!(opcode),
             },
             0x9000 => self.op_9xy0(dec_x!(opcode), dec_y!(opcode)),
@@ -193,102 +189,101 @@ impl Chip8 {
         }
     }
 
-    // 00E0
-    // Clear the screen.
+    // 00E0 - CLS
+    // Clear the display.
     fn op_00e0(&mut self) {
         self.video.fill(0);
     }
 
-    // 00EE
+    // 00EE - RET
     // Return from a subroutine.
     fn op_00ee(&mut self) {
         self.sp -= 1;
         self.pc = self.stack[self.sp as usize];
     }
 
-    // 0NNN
-    // Jump to a machine code routine at NNN.
-    // Ignored by modern interpreters.
+    // 0nnn - SYS addr
+    // Jump to a machine code routine at nnn.
+    // This instruction is only used on the old computers on which Chip-8 was originally implemented.
+    // It is ignored by modern interpreters.
     fn op_0nnn(&self) {}
 
-    // 1NNN
-    // Jump to address NNN.
+    // 1nnn - JP addr
+    // Jump to location nnn.
     fn op_1nnn(&mut self, addr: u16) {
         self.pc = addr;
     }
 
-    // 2NNN
-    // Execute subroutine starting at address NNN.
+    // 2nnn - CALL addr
+    // Call subroutine at nnn.
     fn op_2nnn(&mut self, addr: u16) {
         self.stack[self.sp as usize] = self.pc;
         self.sp += 1;
         self.pc = addr;
     }
 
-    // 3XNN
-    // Skip the following instruction if the value of register VX equals NN.
-    fn op_3xnn(&mut self, x: usize, nn: u8) {
-        if self.v[x] == nn {
+    // 3xkk - SE Vx, byte
+    // Skip next instruction if Vx = kk.
+    fn op_3xnn(&mut self, x: usize, kk: u8) {
+        if self.v[x] == kk {
             self.pc += 2;
         }
     }
 
-    // 4XNN
-    // Skip the following instruction if the value of register VX is not equal to NN.
-    fn op_4xnn(&mut self, x: usize, nn: u8) {
-        if self.v[x] != nn {
+    // 4xkk - SNE Vx, byte
+    // Skip next instruction if Vx != kk.
+    fn op_4xnn(&mut self, x: usize, kk: u8) {
+        if self.v[x] != kk {
             self.pc += 2;
         }
     }
 
-    // 5XY0
-    // Skip the following instruction if the value of register VX is equal to the value of register VY.
+    // 5xy0 - SE Vx, Vy
+    // Skip next instruction if Vx = Vy.
     fn op_5xy0(&mut self, x: usize, y: usize) {
         if self.v[x] == self.v[y] {
             self.pc += 2;
         }
     }
 
-    // 6XNN
-    // Store number NN in register VX.
-    fn op_6xnn(&mut self, x: usize, nn: u8) {
-        self.v[x] = nn;
+    // 6xkk - LD Vx, byte
+    // Set Vx = kk.
+    fn op_6xnn(&mut self, x: usize, kk: u8) {
+        self.v[x] = kk;
     }
 
-    // 7XNN
-    // Add the value NN to register VX.
-    fn op_7xnn(&mut self, x: usize, nn: u8) {
-        self.v[x] = self.v[x].wrapping_add(nn);
+    // 7xkk - ADD Vx, byte
+    // Set Vx = Vx + kk.
+    fn op_7xnn(&mut self, x: usize, kk: u8) {
+        self.v[x] = self.v[x].wrapping_add(kk);
     }
 
-    // 8XY0
-    // Store the value of register VY in register VX.
+    // 8xy0 - LD Vx, Vy
+    // Set Vx = Vy.
     fn op_8xy0(&mut self, x: usize, y: usize) {
         self.v[x] = self.v[y];
     }
 
-    // 8XY1
-    // Set VX to VX OR VY.
+    // 8xy1 - OR Vx, Vy
+    // Set Vx = Vx OR Vy.
     fn op_8xy1(&mut self, x: usize, y: usize) {
         self.v[x] |= self.v[y];
     }
 
-    // 8XY2
-    // Set VX to VX AND VY.
+    // 8xy2 - AND Vx, Vy
+    // Set Vx = Vx AND Vy.
     fn op_8xy2(&mut self, x: usize, y: usize) {
         self.v[x] &= self.v[y];
     }
 
-    // 8XY3
-    // Set VX to VX XOR VY.
+    // 8xy3 - XOR Vx, Vy
+    // Set Vx = Vx XOR Vy.
     fn op_8xy3(&mut self, x: usize, y: usize) {
         self.v[x] ^= self.v[y];
     }
 
-    // 8XY4
-    // Add the value of register VY to register VX.
-    // Set VF to 01 if a carry occurs.
-    // Set VF to 00 if a carry does not occur.
+    // 8xy4 - ADD Vx, Vy
+    // Set Vx = Vx + Vy, set VF = carry.
     fn op_8xy4(&mut self, x: usize, y: usize) {
         let (sum, carry) = self.v[x].overflowing_add(self.v[y]);
 
@@ -296,10 +291,8 @@ impl Chip8 {
         self.v[0xF] = carry.into();
     }
 
-    // 8XY5
-    // Subtract the value of register VY from register VX.
-    // Set VF to 00 if a borrow occurs.
-    // Set VF to 01 if a borrow does not occur
+    // 8xy5 - SUB Vx, Vy
+    // Set Vx = Vx - Vy, set VF = NOT borrow.
     fn op_8xy5(&mut self, x: usize, y: usize) {
         let (sub, borrow) = self.v[x].overflowing_sub(self.v[y]);
 
@@ -307,30 +300,16 @@ impl Chip8 {
         self.v[0xF] = (!borrow).into();
     }
 
-    // 8XY6
-    //
-    // If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0.
-    // Then Vx is divided by 2.
-    //
-    // or
-    //
-    // Store the value of register VY shifted right one bit in register VX.
-    // Set register VF to the least significant bit prior to the shift.
-    // VY is unchanged
-    fn op_8xy6(&mut self, x: usize, y: usize) {
-        if self.schip_shift {
-            self.v[0xF] = self.v[x] & 1;
-            self.v[x] >>= 1;
-        } else {
-            self.v[0xF] = self.v[y] & 1;
-            self.v[x] = self.v[y] >> 1;
-        }
+    // 8xy6 - SHR Vx {, Vy}
+    // Set Vx = Vx SHR 1.
+    // If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0. Then Vx is divided by 2.
+    fn op_8xy6(&mut self, x: usize) {
+        self.v[0xF] = self.v[x] & 1;
+        self.v[x] >>= 1;
     }
 
-    // 8XY7
-    // Set register VX to the value of VY minus VX.
-    // Set VF to 00 if a borrow occurs.
-    // Set VF to 01 if a borrow does not occur.
+    // 8xy7 - SUBN Vx, Vy
+    // Set Vx = Vy - Vx, set VF = NOT borrow.
     fn op_8xy7(&mut self, x: usize, y: usize) {
         let (sub, borrow) = self.v[y].overflowing_sub(self.v[x]);
 
@@ -338,55 +317,42 @@ impl Chip8 {
         self.v[0xF] = (!borrow).into();
     }
 
-    // 8XYE
-    //
-    // If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0.
-    // Then Vx is multiplied by 2.
-    //
-    // or
-    //
-    // Store the value of register VY shifted left one bit in register VX.
-    // Set register VF to the most significant bit prior to the shift.
-    // VY is unchanged.
-    fn op_8xye(&mut self, x: usize, y: usize) {
-        if self.schip_shift {
-            self.v[0xF] = (self.v[x] >> 7) & 1;
-            self.v[x] <<= 1;
-        } else {
-            self.v[0xF] = (self.v[y] >> 7) & 1;
-            self.v[x] = self.v[y] << 1;
-        }
+    // 8xyE - SHL Vx {, Vy}
+    // Set Vx = Vx SHL 1.
+    // If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0. Then Vx is multiplied by 2.
+    fn op_8xye(&mut self, x: usize) {
+        self.v[0xF] = (self.v[x] >> 7) & 1;
+        self.v[x] <<= 1;
     }
 
-    // 9XY0
-    // Skip the following instruction if the value of register VX is not equal to the value of register VY.
+    // 9xy0 - SNE Vx, Vy
+    // Skip next instruction if Vx != Vy.
     fn op_9xy0(&mut self, x: usize, y: usize) {
         if self.v[x] != self.v[y] {
             self.pc += 2;
         }
     }
 
-    // ANNN
-    // Store memory address NNN in register I.
+    // Annn - LD I, addr
+    // Set I = nnn.
     fn op_annn(&mut self, addr: u16) {
         self.i = addr;
     }
 
-    // BNNN
-    // Jump to address NNN + V0.
+    // Bnnn - JP V0, addr
+    // Jump to location nnn + V0.
     fn op_bnnn(&mut self, nnn: u16) {
         self.pc = nnn + self.v[0] as u16;
     }
 
-    // CXNN
-    // Set VX to a random number with a mask of NN.
-    fn op_cxnn(&mut self, x: usize, nn: u8) {
-        self.v[x] = fastrand::u8(0..=255) & nn;
+    // Cxkk - RND Vx, byte
+    // Set Vx = random byte AND kk.
+    fn op_cxnn(&mut self, x: usize, kk: u8) {
+        self.v[x] = fastrand::u8(0..=255) & kk;
     }
 
-    // DXYN
-    // Draw a sprite at position VX, VY with N bytes of sprite data starting at the address stored in I.
-    // Set VF to 01 if any set pixels are changed to unset, and 00 otherwise.
+    // Dxyn - DRW Vx, Vy, nibble
+    // Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
     fn op_dxyn(&mut self, x: usize, y: usize, n: u8) {
         // Wrap x and y.
         let x = self.v[x] as usize % VIDEO_COLS;
@@ -427,8 +393,8 @@ impl Chip8 {
         }
     }
 
-    // EX9E
-    // Skip the following instruction if the key corresponding to the hex value currently stored in register VX is pressed.
+    // Ex9E - SKP Vx
+    // Skip next instruction if key with the value of Vx is pressed.
     fn op_ex9e(&mut self, x: usize) {
         let vx = self.v[x] as usize;
 
@@ -437,8 +403,8 @@ impl Chip8 {
         }
     }
 
-    // EXA1
-    // Skip the following instruction if the key corresponding to the hex value currently stored in register VX is not pressed.
+    // ExA1 - SKNP Vx
+    // Skip next instruction if key with the value of Vx is not pressed.
     fn op_exa1(&mut self, x: usize) {
         let vx = self.v[x] as usize;
 
@@ -447,14 +413,14 @@ impl Chip8 {
         }
     }
 
-    // FX07
-    // Store the current value of the delay timer in register VX.
+    // Fx07 - LD Vx, DT
+    // Set Vx = delay timer value.
     fn op_fx07(&mut self, x: usize) {
         self.v[x] = self.delay_t;
     }
 
-    // FX0A
-    // Wait for a keypress and store the result in register VX.
+    // Fx0A - LD Vx, K
+    // Wait for a key press, store the value of the key in Vx.
     fn op_fx0a(&mut self, x: usize) {
         println!("Waiting for key...");
 
@@ -474,20 +440,20 @@ impl Chip8 {
         self.pc -= 2;
     }
 
-    // FX15
-    // Set the delay timer to the value of register VX.
+    // Fx15 - LD DT, Vx
+    // Set delay timer = Vx.
     fn op_fx15(&mut self, x: usize) {
         self.delay_t = self.v[x];
     }
 
-    // FX18
-    // Set the sound timer to the value of register VX.
+    // Fx18 - LD ST, Vx
+    // Set sound timer = Vx.
     fn op_fx18(&mut self, x: usize) {
         self.buzzer_t = self.v[x];
     }
 
-    // FX1E
-    // Add the value stored in register VX to register I.
+    // Fx1E - ADD I, Vx
+    // Set I = I + Vx.
     fn op_fx1e(&mut self, x: usize) {
         let vx = self.v[x] as u16;
 
@@ -495,16 +461,16 @@ impl Chip8 {
         self.v[0xF] = if self.i > 0xFFF { 1 } else { 0 };
     }
 
-    // FX29
-    // Set I to the memory address of the sprite data corresponding to the hexadecimal digit stored in register VX.
+    // Fx29 - LD F, Vx
+    // Set I = location of sprite for digit Vx.
     fn op_fx29(&mut self, x: usize) {
         let vx = self.v[x] as u16;
 
         self.i = vx * 5;
     }
 
-    // FX33
-    // Store the binary-coded decimal equivalent of the value stored in register VX at addresses I, I + 1, and I + 2.
+    // Fx33 - LD B, Vx
+    // Store BCD representation of Vx in memory locations I, I+1, and I+2.
     fn op_fx33(&mut self, x: usize) {
         let n = self.v[x];
         let i = self.i as usize;
@@ -514,29 +480,19 @@ impl Chip8 {
         self.mem[i + 2] = n % 10;
     }
 
-    // FX55
-    // Store the values of registers V0 to VX inclusive in memory starting at address I.
-    // I is set to I + X + 1 after operation.
+    // Fx55 - LD [I], Vx
+    // Store registers V0 through Vx in memory starting at location I.
     fn op_fx55(&mut self, x: usize) {
         for i in 0..=x {
             self.mem[self.i as usize + i] = self.v[i];
         }
-
-        if !self.schip_load {
-            self.i += (x + 1) as u16;
-        }
     }
 
-    // FX65
-    // Fill registers V0 to VX inclusive with the values stored in memory starting at address I.
-    // I is set to I + X + 1 after operation.
+    // Fx65 - LD Vx, [I]
+    // Read registers V0 through Vx from memory starting at location I.
     fn op_fx65(&mut self, x: usize) {
         for i in 0..=x {
             self.v[i] = self.mem[self.i as usize + i];
-        }
-
-        if !self.schip_load {
-            self.i += (x + 1) as u16;
         }
     }
 }
