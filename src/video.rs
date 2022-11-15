@@ -39,8 +39,8 @@ impl Video {
         }
     }
 
-    pub fn draw(&mut self, chip8_buffer: &[u8]) {
-        let rects = chip8_buffer
+    pub fn draw(&mut self, chip8_video: &[u8]) {
+        let rects = chip8_video
             .into_iter()
             .enumerate()
             .filter_map(|(i, &pixel)| {

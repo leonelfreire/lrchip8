@@ -45,7 +45,7 @@ pub struct Chip8 {
     video: [u8; VIDEO_SIZE],
     keys: [bool; KEYS_SIZE],
     delay_t: u8,
-    buzzer_t: u8,
+    audio_t: u8,
     wait_for_key: Option<u8>,
 }
 
@@ -66,7 +66,7 @@ impl Chip8 {
             video: [0u8; VIDEO_SIZE],
             keys: [false; KEYS_SIZE],
             delay_t: 0,
-            buzzer_t: 0,
+            audio_t: 0,
             wait_for_key: None,
         }
     }
@@ -79,8 +79,12 @@ impl Chip8 {
         VIDEO_ROWS
     }
 
-    pub fn read_video(&self) -> &[u8] {
+    pub fn video(&self) -> &[u8] {
         &self.video
+    }
+
+    pub fn audio(&self) -> bool {
+        return self.audio_t > 0;
     }
 
     pub fn write_keys(&mut self, keys: &[bool]) {
@@ -89,7 +93,7 @@ impl Chip8 {
 
     pub fn update_timers(&mut self) {
         self.delay_t = self.delay_t.saturating_sub(1);
-        self.buzzer_t = self.buzzer_t.saturating_sub(1);
+        self.audio_t = self.audio_t.saturating_sub(1);
     }
 
     pub fn load(&mut self, rom: &[u8]) {
@@ -450,7 +454,7 @@ impl Chip8 {
     // Fx18 - LD ST, Vx
     // Set sound timer = Vx.
     fn op_fx18(&mut self, x: usize) {
-        self.buzzer_t = self.v[x];
+        self.audio_t = self.v[x];
     }
 
     // Fx1E - ADD I, Vx

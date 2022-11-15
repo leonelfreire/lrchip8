@@ -4,6 +4,7 @@ use std::{
 };
 
 use lrchip8::{
+    audio::Audio,
     chip8::Chip8,
     input::{self, Input},
     video::Video,
@@ -24,11 +25,15 @@ fn main() {
 
     let rom_path = &args[1];
 
+    let mut chip8 = Chip8::init();
+    let rom = fs::read(rom_path).unwrap();
+
+    chip8.load(&rom);
+
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
+    let audio_subsystem = sdl_context.audio().unwrap();
     let event_pump = sdl_context.event_pump().unwrap();
-
-    let mut chip8 = Chip8::init();
 
     let mut video = Video::init(
         video_subsystem,
@@ -39,20 +44,18 @@ fn main() {
         Color::RGB(225, 225, 225),
     );
 
+    let audio = Audio::init(audio_subsystem);
+
     let mut input = Input::init(event_pump);
 
-    let rom = fs::read(rom_path).unwrap();
-
-    chip8.load(&rom);
-
     let secs_per_frame = Duration::from_secs_f64(SECS_PER_FRAME);
-
     'mainloop: loop {
         let start_time = Instant::now();
 
         chip8.update_timers();
 
-        for _ in 0..12 { // 720hz
+        // 720hz
+        for _ in 0..12 {
             let keys = input.read();
 
             if keys[input::KEY_QUIT] {
@@ -63,7 +66,8 @@ fn main() {
             chip8.tick();
         }
 
-        video.draw(chip8.read_video());
+        audio.play(chip8.audio());
+        video.draw(chip8.video());
 
         thread::sleep(
             secs_per_frame.saturating_sub(Instant::now().saturating_duration_since(start_time)),
