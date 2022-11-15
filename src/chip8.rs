@@ -427,10 +427,12 @@ impl Chip8 {
     // Fx0A - LD Vx, K
     // Wait for a key press, store the value of the key in Vx.
     fn op_fx0a(&mut self, x: usize) {
+        #[cfg(debug_assertions)]
         println!("Waiting for key...");
 
         if let Some(key) = self.wait_for_key {
             if !self.keys[key as usize] {
+                #[cfg(debug_assertions)]
                 println!("Got key 0x{:X}.", key);
                 self.v[x] = key;
                 self.wait_for_key = None;

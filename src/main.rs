@@ -13,7 +13,7 @@ use sdl2::pixels::Color;
 
 const FPS: f64 = 60.0;
 const SECS_PER_FRAME: f64 = 1.0 / FPS;
-const SCALE_FACTOR: usize = 24;
+const SCALE_FACTOR: usize = 16;
 
 fn main() {
     let args = env::args().collect::<Vec<String>>();
