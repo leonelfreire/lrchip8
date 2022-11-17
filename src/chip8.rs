@@ -16,6 +16,7 @@ const VIDEO_SIZE: usize = VIDEO_COLS * VIDEO_ROWS;
 
 const KEYS_SIZE: usize = 16;
 
+const FONT_BYTES_PER_CHAR: u16 = 5;
 const FONT_SET: [u8; 80] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -106,7 +107,7 @@ impl Chip8 {
             rom_area.copy_from_slice(rom);
             println!("{} bytes loaded.", rom.len());
         } else {
-            panic!("The program is too big to fit in memory.");
+            panic!("The rom is too big to fit in memory.");
         }
 
         self.pc = ROM_START_ADDR as u16;
@@ -443,7 +444,6 @@ impl Chip8 {
                 return;
             }
         } else if let Some(key) = self.keys.iter().position(|&k| k) {
-            self.keys[key] = true;
             self.wait_for_key = Some(key as u8);
         }
 
@@ -477,7 +477,7 @@ impl Chip8 {
     fn op_fx29(&mut self, x: usize) {
         let vx = self.v[x] as u16;
 
-        self.i = vx * 5;
+        self.i = vx * FONT_BYTES_PER_CHAR;
     }
 
     // Fx33 - LD B, Vx

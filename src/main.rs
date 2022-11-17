@@ -11,9 +11,12 @@ use lrchip8::{
 };
 use sdl2::pixels::Color;
 
+const CLOCK: u32 = 600;
+
 const FPS: f64 = 60.0;
 const SECS_PER_FRAME: f64 = 1.0 / FPS;
-const SCALE_FACTOR: usize = 16;
+const ITERS_PER_FRAME: u32 = CLOCK / FPS as u32;
+const VIDEO_SCALE_FACTOR: usize = 16;
 
 fn main() {
     let args = env::args().collect::<Vec<String>>();
@@ -39,7 +42,7 @@ fn main() {
         video_subsystem,
         chip8.video_cols(),
         chip8.video_rows(),
-        SCALE_FACTOR,
+        VIDEO_SCALE_FACTOR,
         Color::BLACK,
         Color::RGB(225, 225, 225),
     );
@@ -49,13 +52,15 @@ fn main() {
     let mut input = Input::init(event_pump);
 
     let secs_per_frame = Duration::from_secs_f64(SECS_PER_FRAME);
+
+    println!("Clock: {}Hz", ITERS_PER_FRAME * FPS as u32);
+
     'mainloop: loop {
         let start_time = Instant::now();
 
         chip8.update_timers();
 
-        // 720hz
-        for _ in 0..12 {
+        for _ in 0..ITERS_PER_FRAME {
             let keys = input.read();
 
             if keys[input::KEY_QUIT] {
