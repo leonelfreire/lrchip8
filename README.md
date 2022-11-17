@@ -1,6 +1,6 @@
 # lrchip8
 
-A CHIP-8 interpreter written in Rust using [rust-sdl2](https://github.com/Rust-SDL2/rust-sdl2).
+A **CHIP-8** interpreter written in Rust using [rust-sdl2](https://github.com/Rust-SDL2/rust-sdl2).
 
 > [CHIP-8](https://en.wikipedia.org/wiki/CHIP-8) is an interpreted
 > programming language, developed by Joseph Weisbecker made on his 1802
