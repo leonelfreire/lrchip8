@@ -44,7 +44,7 @@ fn main() {
         chip8.video_rows(),
         VIDEO_SCALE_FACTOR,
         Color::BLACK,
-        Color::RGB(225, 225, 225),
+        Color::RGB(255, 176, 0),
     );
 
     let audio = Audio::init(audio_subsystem);
