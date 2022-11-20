@@ -11,7 +11,7 @@ use lrchip8::{
 };
 use sdl2::pixels::Color;
 
-const IPS: u32 = 600;
+const IPS: u32 = 800;
 const FPS: f64 = 60.0;
 
 const SECS_PER_FRAME: f64 = 1.0 / FPS;
@@ -61,7 +61,7 @@ fn main() {
 
         chip8.update_timers();
 
-        for _ in 0..ITERS_PER_FRAME {
+        for i in 0..ITERS_PER_FRAME {
             let keys = input.read();
 
             if keys[input::KEY_QUIT] {
@@ -69,6 +69,7 @@ fn main() {
             }
 
             chip8.write_keys(&keys);
+            chip8.set_vblank(i == 0);
             chip8.tick();
         }
 

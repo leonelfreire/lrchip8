@@ -48,6 +48,7 @@ pub struct Chip8 {
     delay_t: u8,
     audio_t: u8,
     wait_for_key: Option<u8>,
+    vblank: bool,
 }
 
 impl Chip8 {
@@ -69,6 +70,7 @@ impl Chip8 {
             delay_t: 0,
             audio_t: 0,
             wait_for_key: None,
+            vblank: false,
         }
     }
 
@@ -122,6 +124,10 @@ impl Chip8 {
         self.load(&rom8);
     }
 
+    pub fn set_vblank(&mut self, vblank: bool) {
+        self.vblank = vblank;
+    }
+
     pub fn tick(&mut self) {
         let opcode = self.fetch();
 
@@ -148,7 +154,7 @@ impl Chip8 {
             0x0000 => match opcode {
                 0x00E0 => self.op_00e0(),
                 0x00EE => self.op_00ee(),
-                _ => self.op_0nnn(),
+                _ => self.op_0nnn(opcode),
             },
             0x1000 => self.op_1nnn(dec_addr!(opcode)),
             0x2000 => self.op_2nnn(dec_addr!(opcode)),
@@ -212,7 +218,12 @@ impl Chip8 {
     // Jump to a machine code routine at nnn.
     // This instruction is only used on the old computers on which Chip-8 was originally implemented.
     // It is ignored by modern interpreters.
-    fn op_0nnn(&self) {}
+    fn op_0nnn(&self, opcode: u16) {
+        println!(
+            "Machine code routine: [OP=0x{:0>4X}] [I=0x{:0>4X}, PC=0x{:0>4X}, SP=0x{:0>4X}, V={:?}]",
+            opcode, self.i, self.pc, self.sp, self.v
+        );
+    }
 
     // 1nnn - JP addr
     // Jump to location nnn.
@@ -364,6 +375,12 @@ impl Chip8 {
     // Dxyn - DRW Vx, Vy, nibble
     // Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
     fn op_dxyn(&mut self, x: usize, y: usize, n: u8) {
+        // Wait for vblank.
+        if !self.vblank {
+            self.pc -= 2;
+            return;
+        }
+
         // Wrap x and y.
         let x = self.v[x] as usize % VIDEO_COLS;
         let y = self.v[y] as usize % VIDEO_ROWS;
