@@ -68,7 +68,7 @@ fn main() {
                 break 'mainloop;
             }
 
-            chip8.write_keys(&keys);
+            chip8.write_keys(keys);
             chip8.set_vblank(i == 0);
             chip8.tick();
         }

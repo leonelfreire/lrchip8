@@ -87,7 +87,7 @@ impl Chip8 {
     }
 
     pub fn audio(&self) -> bool {
-        return self.audio_t > 0;
+        self.audio_t > 0
     }
 
     pub fn write_keys(&mut self, keys: &[bool]) {
@@ -425,7 +425,7 @@ impl Chip8 {
     fn op_ex9e(&mut self, x: usize) {
         let vx = self.v[x] as usize;
 
-        if self.keys[vx] == true {
+        if self.keys[vx] {
             self.pc += 2;
         }
     }
@@ -435,7 +435,7 @@ impl Chip8 {
     fn op_exa1(&mut self, x: usize) {
         let vx = self.v[x] as usize;
 
-        if self.keys[vx] == false {
+        if !self.keys[vx] {
             self.pc += 2;
         }
     }
@@ -486,7 +486,7 @@ impl Chip8 {
         let vx = self.v[x] as u16;
 
         self.i = self.i.wrapping_add(vx);
-        self.v[0xF] = if self.i > 0xFFF { 1 } else { 0 };
+        self.v[0xF] = (self.i > 0xFFF).into();
     }
 
     // Fx29 - LD F, Vx
