@@ -1,6 +1,6 @@
 use std::{
     env, fs, thread,
-    time::{Duration, Instant},
+    time::{self, Duration, Instant, SystemTime},
 };
 
 use lrchip8::{
@@ -29,7 +29,14 @@ fn main() {
 
     let rom_path = &args[1];
 
-    let mut chip8 = Chip8::init();
+    let rng_seed = SystemTime::now()
+        .duration_since(time::UNIX_EPOCH)
+        .expect("SystemTime before UNIX EPOCH.")
+        .as_secs();
+
+    println!("RNG seed: {}", rng_seed);
+
+    let mut chip8 = Chip8::init(rng_seed);
     let rom = fs::read(rom_path).unwrap();
 
     chip8.load(&rom);

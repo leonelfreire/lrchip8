@@ -1,5 +1,7 @@
 // Reference: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
 
+use oorandom::Rand32;
+
 use crate::{dec_addr, dec_byte, dec_error, dec_nibble, dec_x, dec_y};
 
 const NUM_REGS: usize = 16;
@@ -49,10 +51,11 @@ pub struct Chip8 {
     audio_t: u8,
     wait_for_key: Option<u8>,
     vblank: bool,
+    rng: Rand32,
 }
 
 impl Chip8 {
-    pub fn init() -> Self {
+    pub fn init(rng_seed: u64) -> Self {
         let mut mem = [0u8; MEM_SIZE];
 
         let font_area = &mut mem[..FONT_SET.len()];
@@ -71,6 +74,7 @@ impl Chip8 {
             audio_t: 0,
             wait_for_key: None,
             vblank: false,
+            rng: Rand32::new(rng_seed),
         }
     }
 
@@ -369,7 +373,7 @@ impl Chip8 {
     // Cxkk - RND Vx, byte
     // Set Vx = random byte AND kk.
     fn op_cxkk(&mut self, x: usize, kk: u8) {
-        self.v[x] = fastrand::u8(0..=255) & kk;
+        self.v[x] = self.rng.rand_range(0..256) as u8 & kk;
     }
 
     // Dxyn - DRW Vx, Vy, nibble
@@ -530,7 +534,7 @@ mod tests {
     use super::Chip8;
 
     fn load_chip8(rom16: &[u16]) -> Chip8 {
-        let mut chip8 = Chip8::init();
+        let mut chip8 = Chip8::init(0);
 
         chip8.load16(rom16);
 
